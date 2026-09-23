@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  ArrowLeft, ArrowUpRight, Building2, CalendarClock, Check, FileText, Landmark, Mail, Phone, Plus, Search, Send, Sparkles, StickyNote, Users,
+  ArrowLeft, ArrowUpRight, Building2, CalendarClock, Check, FileText, Landmark, Mail, Mic, Phone, Plus, Search, Send, Sparkles, StickyNote, Users,
 } from "lucide-react";
 import { uid, useNav, useStore } from "../lib/store";
 import { daysFrom, fmtDate, moneyFull, relDate, type Client, type Comm } from "../lib/data";
@@ -179,6 +179,22 @@ function ClientDetail({ client, onBack }: { client: Client; onBack: () => void }
   const [tab, setTab] = useState<"overview" | "activity" | "notes">("overview");
   const [note, setNote] = useState("");
   const [comm, setComm] = useState("");
+  const [callOpen, setCallOpen] = useState(false);
+
+  const endCall = (secs: number, rawNotes: string) => {
+    const mins = Math.max(1, Math.round(secs / 60));
+    const spoken = rawNotes.split("\n").find((l) => l.trim() && !l.toLowerCase().startsWith("task:"));
+    dispatch({
+      type: "ADD_COMM",
+      clientId: client.id,
+      comm: { id: uid(), type: "call", dir: "out", date: daysFrom(0), summary: `Strategy call (${mins}m): ${spoken?.trim() || "agenda covered"}. Filed live by Meeting Scribe.` },
+    });
+    const extracted = rawNotes.split("\n").filter((l) => l.toLowerCase().startsWith("task:")).map((l) => l.replace(/task:/i, "").trim()).filter(Boolean);
+    extracted.forEach((title) =>
+      dispatch({ type: "ADD_TASK", task: { id: uid(), title, clientId: client.id, due: daysFrom(2), priority: "medium", done: false, kind: "deliverable", ai: true } }));
+    setCallOpen(false);
+    toast(`Call filed to ${client.name.split(" ")[0]}'s record — ${extracted.length} action${extracted.length === 1 ? "" : "s"} extracted`, <Mic size={14} />);
+  };
 
   const projects = state.projects.filter((p) => p.clientId === client.id && p.status !== "done");
   const tasks = state.tasks.filter((t) => t.clientId === client.id && !t.done);
@@ -225,12 +241,12 @@ function ClientDetail({ client, onBack }: { client: Client; onBack: () => void }
         <div className="mt-6 flex flex-wrap gap-2.5">
           {[
             { icon: Mail, label: "Email", fn: () => toast(`Email to ${client.name.split(" ")[0]} drafted by Ordo`, <Mail size={14} />) },
-            { icon: Phone, label: "Call", fn: () => toast(`Calling ${client.name.split(" ")[0]}… Scribe is listening`, <Phone size={14} />) },
+            { icon: Phone, label: "Call", fn: () => setCallOpen(true) },
             { icon: CalendarClock, label: "Schedule", fn: () => toast("Calendar link sent", <CalendarClock size={14} />) },
             { icon: Sparkles, label: "AI: next best move", fn: () => toast(client.aiNext, <Sparkles size={14} />) },
           ].map((a) => (
-            <button key={a.label} onClick={a.fn} className="btn-ghost flex items-center gap-2 px-4 py-2.5 text-[12.5px] font-semibold">
-              <a.icon size={14} className="text-gold-400" /> {a.label}
+            <button key={a.label} onClick={a.fn} className={`flex items-center gap-2 px-4 py-2.5 text-[12.5px] font-semibold transition ${a.label === "Call" ? "border border-gold-500/40 bg-gold-500/12 text-gold-300 hover:bg-gold-500/20" : "btn-ghost"}`}>
+              <a.icon size={14} className={a.label === "Call" ? "text-gold-300" : "text-gold-400"} /> {a.label === "Call" ? "Start call mode" : a.label}
             </button>
           ))}
         </div>
@@ -386,6 +402,126 @@ function ClientDetail({ client, onBack }: { client: Client; onBack: () => void }
           )}
         </motion.div>
       </AnimatePresence>
+
+      <MeetingMode open={callOpen} client={client} onEnd={endCall} onClose={() => setCallOpen(false)} />
     </motion.div>
+  );
+}
+
+/* ============================ meeting mode ============================ */
+
+function MeetingMode({ open, client, onEnd, onClose }: { open: boolean; client: Client; onEnd: (secs: number, notes: string) => void; onClose: () => void }) {
+  const { state } = useStore();
+  const [secs, setSecs] = useState(0);
+  const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    setSecs(0);
+    setNotes("");
+    const t = setInterval(() => setSecs((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [open]);
+
+  if (!open) return null;
+
+  const waiting = state.projects.filter((p) => p.clientId === client.id && p.ball === "client" && p.status !== "done");
+  const mine = state.tasks.filter((t) => t.clientId === client.id && !t.done);
+  const points: string[] = [
+    client.aiNext,
+    ...waiting.map((p) => `They owe you: ${p.waitingNote ?? p.name}`),
+    ...mine.filter((t) => t.priority === "high").map((t) => `Your side: ${t.title}`),
+    `Revenue at stake: ${moneyFull(client.revenue)}/yr — relationship is ${client.health >= 80 ? "strong" : client.health >= 65 ? "fair" : "delicate"}`,
+  ].slice(0, 5);
+
+  const mm = String(Math.floor(secs / 60)).padStart(2, "0");
+  const ss = String(secs % 60).padStart(2, "0");
+
+  return (
+    <div className="fixed inset-0 z-[85] flex items-center justify-center p-4">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      <motion.div
+        initial={{ opacity: 0, y: 30, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 20, scale: 0.97 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className="gold-edge relative w-full max-w-3xl overflow-hidden rounded-3xl bg-ink-850 p-7 shadow-luxe"
+      >
+        {/* header */}
+        <div className="mb-6 flex flex-wrap items-center gap-4">
+          <span className="relative flex h-3 w-3">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gold-400 opacity-60" />
+            <span className="relative inline-flex h-3 w-3 rounded-full bg-gold-400" />
+          </span>
+          <div className="flex-1">
+            <p className="font-display text-[20px] text-cream-50">Call with {client.name}</p>
+            <p className="flex items-center gap-1.5 text-[11.5px] text-cream-500">
+              <Mic size={11} className="text-gold-400" /> Meeting Scribe is listening — notes file themselves when you hang up
+            </p>
+          </div>
+          <p className="font-display text-[34px] tabular-nums tracking-wide text-gold-300">{mm}:{ss}</p>
+        </div>
+
+        <div className="grid gap-5 md:grid-cols-[240px_1fr]">
+          {/* left: context */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/3 p-3.5">
+              <Avatar src={client.avatar} name={client.name} size={44} ring />
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-semibold text-cream-100">{client.company}</p>
+                <p className="text-[10.5px] text-cream-600">since {client.since} · {moneyFull(client.revenue)}/yr</p>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-white/8 bg-white/3 p-3.5 text-center">
+              <Ring value={client.health} size={62} />
+              <p className="mt-1 text-[9.5px] uppercase tracking-widest text-cream-600">relationship health</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div className="rounded-xl border border-white/8 bg-white/3 p-2.5">
+                <p className="font-display text-lg text-cream-50">{mine.length}</p>
+                <p className="text-[9px] uppercase tracking-widest text-cream-600">open items</p>
+              </div>
+              <div className="rounded-xl border border-white/8 bg-white/3 p-2.5">
+                <p className="font-display text-lg text-gold-300">{waiting.length}</p>
+                <p className="text-[9px] uppercase tracking-widest text-cream-600">owed by them</p>
+              </div>
+            </div>
+          </div>
+
+          {/* right: points + notes */}
+          <div className="space-y-3.5">
+            <div className="rounded-2xl border border-gold-500/20 bg-gold-500/6 p-4">
+              <p className="mb-2 flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-gold-400">
+                <Sparkles size={11} /> Talking points — prepared for this moment
+              </p>
+              <ul className="space-y-1.5">
+                {points.map((p, i) => (
+                  <li key={i} className="flex gap-2 text-[12.5px] leading-snug text-cream-200">
+                    <span className="mt-1.5 h-1 w-4 shrink-0 rounded-full bg-gold-500/60" /> {p}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <textarea
+              autoFocus
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder={"Jot as you talk…\nA line starting with  task:  becomes a real task\n\ne.g.  task: send CRT timelines to trustee"}
+              className="input-luxe h-36 w-full resize-none p-4 text-[13px] leading-relaxed"
+            />
+          </div>
+        </div>
+
+        <div className="mt-5 flex items-center justify-between">
+          <p className="text-[10.5px] text-cream-600">Last touch filed: {client.comms[0] ? relDate(client.comms[0].date) : "—"}</p>
+          <div className="flex gap-2.5">
+            <button onClick={onClose} className="btn-ghost px-4 py-2.5 text-[12.5px] font-semibold">Silent close</button>
+            <button onClick={() => onEnd(secs, notes)} className="btn-gold flex items-center gap-2 px-5 py-2.5 text-[13px]">
+              <Mic size={14} /> End call — file & extract tasks
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
   );
 }

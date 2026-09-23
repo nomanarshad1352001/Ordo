@@ -20,6 +20,7 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
       { id: "pg3", label: "Leads & Prospects", hint: "Page", icon: UserPlus, route: { name: "leads" }, keywords: "prospects pipeline inquiries" },
       { id: "pg4", label: "Clients & Entities", hint: "Page", icon: Users, route: { name: "clients" }, keywords: "accounts companies book" },
       { id: "pg5", label: "Opportunities", hint: "Page", icon: Target, route: { name: "opps" }, keywords: "proposals deals board" },
+      { id: "pg5b", label: "Money — invoices & forecast", hint: "Page", icon: Target, route: { name: "money" }, keywords: "revenue invoices cash paid billing" },
       { id: "pg6", label: "Projects & Engagements", hint: "Page", icon: FolderKanban, route: { name: "projects" }, keywords: "engagements work" },
       { id: "pg7", label: "Tasks & Deadlines", hint: "Page", icon: ListChecks, route: { name: "tasks" }, keywords: "todo deadlines follow-ups" },
       { id: "pg8", label: "Automations", hint: "Page", icon: Workflow, route: { name: "automations" }, keywords: "ai robots workflows" },

@@ -527,3 +527,42 @@ export const INTEGRATIONS: Integration[] = [
   { id: "g8", name: "Client Portal", category: "Documents", desc: "Uploads are classified by AI and filed to the right entity's checklist instantly.", connected: true, icon: "FolderLock", lastSync: "live", flows: 59, note: "custom · sso with Gmail" },
   { id: "g9", name: "OpenAI API", category: "Intelligence", desc: "The drafting and classification brain — every agent above calls it through n8n.", connected: true, icon: "Brain", lastSync: "live", flows: 1030, note: "gpt-class models · 38k tokens/day" },
 ];
+
+/* ------------------------------- invoices ------------------------------ */
+
+export interface Invoice {
+  id: string; ref: string; to: string; clientId?: string; amount: number;
+  status: "paid" | "sent" | "draft" | "overdue"; issued: string; due: string; note: string;
+}
+
+export const INVOICES: Invoice[] = [
+  { id: "v1", ref: "RV-1036", to: "Hale & Harbor Group", clientId: "c1", amount: 6800, status: "paid", issued: daysFrom(-20), due: daysFrom(-6), note: "1120-S ×3 entities — interim billing" },
+  { id: "v2", ref: "RV-1041", to: "Nakamura Law PLLC", clientId: "c8", amount: 1850, status: "paid", issued: daysFrom(-8), due: daysFrom(2), note: "Extension + safe-harbor estimates" },
+  { id: "v3", ref: "RV-1040", to: "Ashford Family Office", clientId: "c7", amount: 3600, status: "paid", issued: daysFrom(-10), due: daysFrom(0), note: "1041 work — first installment" },
+  { id: "v4", ref: "RV-1042", to: "Reyes Capital Management", clientId: "c6", amount: 3000, status: "sent", issued: daysFrom(-3), due: daysFrom(9), note: "Q1 CFO strategy memo" },
+  { id: "v5", ref: "RV-1039", to: "Okafor Dental Partners", clientId: "c3", amount: 2750, status: "overdue", issued: daysFrom(-18), due: daysFrom(-4), note: "Advisory — tax plan phase 1" },
+  { id: "v6", ref: "RV-1043", to: "Raman Medspa", clientId: "c2", amount: 2400, status: "draft", issued: daysFrom(0), due: daysFrom(14), note: "December close — awaits final packet" },
+  { id: "v7", ref: "RV-1044", to: "Lindqvist Interiors", clientId: "c4", amount: 950, status: "draft", issued: daysFrom(0), due: daysFrom(16), note: "Q4 estimate vouchers + lease review" },
+];
+
+export const REV_MONTHS = [
+  { m: "Jul", v: 18200 }, { m: "Aug", v: 21050 }, { m: "Sep", v: 16400 },
+  { m: "Oct", v: 24900 }, { m: "Nov", v: 23750 }, { m: "Dec", v: 28600 },
+];
+
+/* -------------------------------- outbox ------------------------------- */
+
+export interface OutboxItem {
+  id: string; kind: "Follow-up" | "Proposal" | "Engagement letter" | "Reminder" | "Welcome" | "Invoice link";
+  refType: "client" | "lead"; refId?: string; toName: string; subject: string;
+  preview: string; agent: string; sent?: boolean; eta: string;
+}
+
+export const OUTBOX: OutboxItem[] = [
+  { id: "ob1", kind: "Engagement letter", refType: "lead", refId: "l1", toName: "Noah Kim", subject: "Kim's Kitchen — fixed-fee S-corp engagement", preview: "Noah — the letter is attached exactly as scoped: payroll registration, first filing, and quarterly touchpoints inside the fixed fee. Signature this week protects your Q1 payroll run…", agent: "Proposal Drafter", eta: "send this morning — heat score decaying" },
+  { id: "ob2", kind: "Follow-up", refType: "lead", refId: "l7", toName: "Maya Sorensen", subject: "Re: New studio tax package — one small thing", preview: "Maya, no pressure sequence — just one question: is tax season timing or budget the blocker? Either way I'll point you right. Thirteen studios started exactly where you are…", agent: "Follow-up Radar", eta: "2 days overdue — trail cooling" },
+  { id: "ob3", kind: "Reminder", refType: "client", refId: "c3", toName: "David Okafor", subject: "One file between you and finished", preview: "David — the bank statements (Sept–Nov) are literally the only open item. Upload via the portal link below; everything else is done and queued…", agent: "Document Chaser", eta: "escalation window now" },
+  { id: "ob4", kind: "Proposal", refType: "lead", refId: "l4", toName: "Anita Whelan", subject: "Estate & trust engagement — Voss & Vale proposal", preview: "Unlike a trust company, you get the principal on every question, Anita. Inside: fixed scope for the 1041s, gift filings, and the CRT advisory with plain-English milestones…", agent: "Proposal Drafter", eta: "comparing you against a trust co. — send today" },
+  { id: "ob5", kind: "Welcome", refType: "lead", refId: "l6", toName: "Lena Marsh", subject: "Welcome aboard — three things happen now", preview: "Lena — first, your portal invite (2-minute setup). Second, a discovery call link. Third, your bookkeeping checklist is already pre-filled from your intake form…", agent: "Smart Intake", eta: "send within 1h of intake for wow effect" },
+  { id: "ob6", kind: "Invoice link", refType: "client", refId: "c5", toName: "Tom Beckett", subject: "Scope recap + progress invoice — Beckett cleanup", preview: "Tom — as agreed on the call: the recap in writing (attached), plus the phase-one invoice so we can resume the moment the Martinez job closes. No surprises…", agent: "Invoice Autopilot", eta: "you approved the recap yesterday" },
+];

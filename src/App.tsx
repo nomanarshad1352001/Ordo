@@ -7,12 +7,14 @@ import TopBar from "./components/TopBar";
 import CommandPalette from "./components/CommandPalette";
 import AIAssistant from "./components/AIAssistant";
 import ProfileModal from "./components/ProfileModal";
+import QuickCapture from "./components/QuickCapture";
 import Login from "./components/Login";
 import Today from "./views/Today";
 import Inbox from "./views/Inbox";
 import Integrations from "./views/Integrations";
 import Leads from "./views/Leads";
 import Clients from "./views/Clients";
+import Money from "./views/Money";
 import Opportunities from "./views/Opportunities";
 import Projects from "./views/Projects";
 import Tasks from "./views/Tasks";
@@ -24,6 +26,7 @@ function Shell() {
   const [palette, setPalette] = useState(false);
   const [ai, setAi] = useState(false);
   const [profile, setProfile] = useState(false);
+  const [capture, setCapture] = useState(false);
 
   const go = (r: Route) => {
     setRoute(r);
@@ -43,6 +46,10 @@ function Shell() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setPalette((p) => !p);
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "j") {
+        e.preventDefault();
+        setCapture((p) => !p);
       }
       if (e.key === "Escape") setPalette(false);
     };
@@ -74,6 +81,7 @@ function Shell() {
                   <TopBar
                     onSearch={() => setPalette(true)}
                     onAI={() => setAi(true)}
+                    onCapture={() => setCapture(true)}
                     onProfile={() => setProfile(true)}
                     onSignOut={signOut}
                   />
@@ -91,6 +99,7 @@ function Shell() {
                       {route.name === "leads" && <Leads />}
                       {route.name === "clients" && <Clients />}
                       {route.name === "opps" && <Opportunities />}
+                      {route.name === "money" && <Money />}
                       {route.name === "projects" && <Projects />}
                       {route.name === "tasks" && <Tasks />}
                       {route.name === "automations" && <Automations />}
@@ -101,6 +110,7 @@ function Shell() {
 
               <CommandPalette open={palette} onClose={() => setPalette(false)} />
               <AIAssistant open={ai} onClose={() => setAi(false)} />
+              <QuickCapture open={capture} onClose={() => setCapture(false)} />
               <ProfileModal open={profile} onClose={() => setProfile(false)} onSignOut={signOut} />
 
               {/* floating AI button for mobile */}

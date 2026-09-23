@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  ArrowLeftRight, BadgeCheck, Calendar, Check, FolderKanban, Hourglass, Plus, Scale, Sparkles, User, Users, X,
+  ArrowLeftRight, BadgeCheck, Calendar, Check, FlaskConical, FolderKanban, Gauge, Hourglass, Plus, Scale, Sparkles, User, Users, X,
 } from "lucide-react";
 import { byClient, uid, useNav, useStore } from "../lib/store";
 import { daysFrom, fmtDate, moneyFull, relDate, type Project } from "../lib/data";
@@ -27,6 +27,23 @@ export default function Projects() {
   const inFlight = active.reduce((a, p) => a + p.fee, 0);
   const atRisk = active.filter((p) => p.status === "at-risk").length;
   const onClient = active.filter((p) => p.ball === "client").length;
+  const [sim, setSim] = useState(false);
+  const CAPACITY = 30;
+
+  const weekLoads = useMemo(() => {
+    const loads = new Array<number>(8).fill(0);
+    active.forEach((p) => {
+      const hrs = Math.max(4, Math.round(p.fee / 200));
+      const weeksLeft = Math.min(8, Math.max(1, Math.ceil((new Date(p.due).getTime() - Date.now()) / (7 * 86400000))));
+      const per = hrs / weeksLeft;
+      for (let w = 0; w < weeksLeft; w++) loads[w] += per;
+    });
+    return loads;
+  }, [active]);
+
+  const display = sim ? weekLoads.map((v, i) => v + (i < 4 ? 4.5 : 0)) : weekLoads;
+  const peak = Math.max(...display);
+  const overloadWeeks = display.map((v, i) => (v > CAPACITY ? i + 1 : 0)).filter(Boolean);
   const sel = state.projects.find((p) => p.id === selected);
   const selClient = sel ? byClient(state, sel.clientId) : undefined;
 
@@ -69,6 +86,62 @@ export default function Projects() {
           </button>
         </span>
       </div>
+
+      {/* season load planner */}
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="card mb-6 p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="flex items-center gap-2 font-display text-lg text-cream-50">
+              <Gauge size={17} className="text-gold-400" /> Season load — next 8 weeks
+            </h2>
+            <p className="mt-0.5 text-xs text-cream-500">Hours estimated from fees ÷ your $200 blended rate, spread to each deadline.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Badge tone={overloadWeeks.length ? "clay" : "sage"} dot>
+              {overloadWeeks.length ? `Over capacity · week${overloadWeeks.length > 1 ? "s" : ""} ${overloadWeeks.join(", ")}` : `Within your ${CAPACITY}h line`}
+            </Badge>
+            <button
+              onClick={() => setSim((v) => !v)}
+              className={`flex items-center gap-2 rounded-xl border px-3.5 py-2 text-[11.5px] font-semibold transition ${sim ? "border-gold-500/50 bg-gold-500/15 text-gold-300" : "btn-ghost"}`}
+            >
+              <FlaskConical size={13} /> {sim ? "Remove simulation" : "Simulate: accept Delacroix ($9k · 18h)"}
+            </button>
+          </div>
+        </div>
+
+        <div className="relative mt-6">
+          <div className="flex h-32 items-end gap-2.5">
+            {display.map((v, i) => {
+              const h = Math.min(100, (v / (CAPACITY * 1.35)) * 100);
+              const over = v > CAPACITY;
+              return (
+                <div key={i} className="group flex flex-1 flex-col items-center gap-1.5">
+                  <span className={`text-[10px] font-semibold tabular-nums ${over ? "text-clay-300" : "text-cream-500"}`}>{Math.round(v)}h</span>
+                  <motion.div
+                    animate={{ height: `${h}%` }}
+                    transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                    className={`w-full rounded-t-md ${over ? "bg-gradient-to-t from-clay-500/70 to-clay-300" : sim && i < 4 ? "bg-gradient-to-t from-gold-600/70 to-gold-300/80" : "bg-gradient-to-t from-ink-600 to-ink-500"}`}
+                    title={sim && i < 4 ? `${Math.round(v)}h incl. winery kickoff` : `${Math.round(v)}h`}
+                  />
+                  <span className="text-[9.5px] font-semibold uppercase tracking-widest text-cream-600">W{i + 1}</span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="pointer-events-none absolute left-0 right-0 border-t border-dashed border-gold-400/50" style={{ bottom: `${(CAPACITY / (CAPACITY * 1.35)) * 100 + 12}%` }}>
+            <span className="absolute -top-2.5 right-0 rounded-full bg-ink-900 px-2 text-[9.5px] font-semibold uppercase tracking-widest text-gold-400">your {CAPACITY}h capacity</span>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-gold-500/20 bg-gold-500/6 p-4">
+          <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-gold-400"><Sparkles size={11} /> Ordo's call</p>
+          <p className="mt-1.5 text-[12.5px] leading-relaxed text-cream-200">
+            {overloadWeeks.length
+              ? `Week${overloadWeeks.length > 1 ? "s" : ""} ${overloadWeeks.join(", ")} break your line${sim ? " with the winery on board" : ""}. Cleanest move: open Delacroix with a February start, or hold the January start at $10.4k to fairly price the squeeze. Deadline Sentinel has already reserved overflow slots either way.`
+              : `Load peaks at ${Math.round(peak)}h — inside your line${sim ? ", winery included" : ""}. You can take the Delacroix engagement at full price without borrowing time from a single client.`}
+          </p>
+        </div>
+      </motion.div>
 
       {/* list */}
       <div className="card overflow-hidden">

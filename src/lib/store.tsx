@@ -1,15 +1,15 @@
 import React, { createContext, useContext, useMemo, useReducer } from "react";
 import {
-  AI_ACTIONS, AUTOMATIONS, CLIENTS, INBOX, INTEGRATIONS, LEADS, NOTIFS, OPPS, PROJECTS, SUGGESTIONS, TASKS,
-  type AIAction, type Automation, type Client, type Comm, type InboxItem, type Integration,
-  type Lead, type LeadStage, type Notif, type Opp, type OppStage, type Project, type Suggestion, type Task, daysFrom,
+  AI_ACTIONS, AUTOMATIONS, CLIENTS, INBOX, INTEGRATIONS, INVOICES, LEADS, NOTIFS, OPPS, OUTBOX, PROJECTS, SUGGESTIONS, TASKS,
+  type AIAction, type Automation, type Client, type Comm, type InboxItem, type Integration, type Invoice,
+  type Lead, type LeadStage, type Notif, type Opp, type OppStage, type OutboxItem, type Project, type Suggestion, type Task, daysFrom, moneyFull as moneyFmt,
 } from "./data";
 
 export const uid = () => Math.random().toString(36).slice(2, 9);
 
 /* ------------------------------ nav ------------------------------- */
 
-export type ViewName = "today" | "inbox" | "leads" | "clients" | "opps" | "projects" | "tasks" | "automations" | "integrations";
+export type ViewName = "today" | "inbox" | "leads" | "clients" | "opps" | "money" | "projects" | "tasks" | "automations" | "integrations";
 export interface Route { name: ViewName; clientId?: string; leadId?: string }
 
 const NavCtx = createContext<{ route: Route; go: (r: Route) => void }>({
@@ -25,12 +25,14 @@ export interface State {
   clients: Client[]; leads: Lead[]; opps: Opp[]; projects: Project[];
   tasks: Task[]; automations: Automation[]; notifs: Notif[]; briefIdx: number;
   suggestions: Suggestion[]; aiActions: AIAction[]; inbox: InboxItem[]; integrations: Integration[];
+  invoices: Invoice[]; outbox: OutboxItem[];
 }
 
 const initial: State = {
   clients: CLIENTS, leads: LEADS, opps: OPPS, projects: PROJECTS,
   tasks: TASKS, automations: AUTOMATIONS, notifs: NOTIFS, briefIdx: 0,
   suggestions: SUGGESTIONS, aiActions: AI_ACTIONS, inbox: INBOX, integrations: INTEGRATIONS,
+  invoices: INVOICES, outbox: OUTBOX,
 };
 
 export type Action =
@@ -58,7 +60,10 @@ export type Action =
   | { type: "UNDO_AI_ACTION"; id: string }
   | { type: "FILE_INBOX"; id: string }
   | { type: "SEND_INBOX"; id: string }
-  | { type: "TOGGLE_INTEGRATION"; id: string };
+  | { type: "TOGGLE_INTEGRATION"; id: string }
+  | { type: "PAY_INVOICE"; id: string }
+  | { type: "SEND_INVOICE"; id: string }
+  | { type: "SEND_OUTBOX"; id: string };
 
 function reducer(s: State, a: Action): State {
   switch (a.type) {
@@ -170,6 +175,36 @@ function reducer(s: State, a: Action): State {
     }
     case "TOGGLE_INTEGRATION":
       return { ...s, integrations: s.integrations.map((x) => (x.id === a.id ? { ...x, connected: !x.connected, lastSync: !x.connected ? "live" : "—" } : x)) };
+    case "PAY_INVOICE":
+      return { ...s, invoices: s.invoices.map((v) => (v.id === a.id ? { ...v, status: "paid" as const } : v)) };
+    case "SEND_INVOICE": {
+      const inv = s.invoices.find((v) => v.id === a.id);
+      const comm: Comm | null = inv?.clientId
+        ? { id: uid(), type: "email", dir: "out", date: daysFrom(0), summary: `Invoice ${inv.ref} sent — ${moneyFmt(inv.amount)}, pay link inside` }
+        : null;
+      return {
+        ...s,
+        invoices: s.invoices.map((v) => (v.id === a.id ? { ...v, status: "sent" as const } : v)),
+        clients: comm ? s.clients.map((c) => (c.id === inv!.clientId ? { ...c, comms: [comm, ...c.comms] } : c)) : s.clients,
+      };
+    }
+    case "SEND_OUTBOX": {
+      const item = s.outbox.find((x) => x.id === a.id);
+      if (!item) return s;
+      let clients = s.clients;
+      let leads = s.leads;
+      if (item.refType === "client" && item.refId) {
+        const comm: Comm = { id: uid(), type: "email", dir: "out", date: daysFrom(0), summary: `${item.kind} sent: “${item.subject}” — drafted by ${item.agent}, approved by you` };
+        clients = s.clients.map((c) => (c.id === item.refId ? { ...c, comms: [comm, ...c.comms] } : c));
+      }
+      if (item.refType === "lead" && item.refId) {
+        leads = s.leads.map((l) =>
+          l.id === item.refId
+            ? { ...l, stage: l.stage === "new" ? ("contacted" as LeadStage) : l.stage, lastContact: daysFrom(0), notes: [{ id: uid(), date: daysFrom(0), author: item.agent, text: `Sent: “${item.subject}”` }, ...l.notes] }
+            : l);
+      }
+      return { ...s, clients, leads, outbox: s.outbox.map((x) => (x.id === a.id ? { ...x, sent: true, eta: "sent just now" } : x)) };
+    }
     default:
       return s;
   }

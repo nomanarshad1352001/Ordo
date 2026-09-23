@@ -21,8 +21,10 @@ export default function Inbox() {
   const { go } = useNav();
   const toast = useToast();
   const [openDraft, setOpenDraft] = useState<string | null>(null);
+  const [tab, setTab] = useState<"in" | "out">("in");
 
   const pending = state.inbox.filter((i) => (i.status ?? "pending") === "pending");
+  const drafts = state.outbox.filter((o) => !o.sent);
   const handled = state.inbox.filter((i) => (i.status ?? "pending") !== "pending");
   const avgConf = Math.round(state.inbox.reduce((a, i) => a + i.confidence, 0) / state.inbox.length);
 
@@ -43,6 +45,11 @@ export default function Inbox() {
     toast(`Reply sent to ${item.from.split(" ")[0]} — voice-matched, filed to record`, <Send size={14} />);
   };
 
+  const sendOut = (id: string, kind: string, toName: string, refType: string) => {
+    dispatch({ type: "SEND_OUTBOX", id });
+    toast(`${kind} sent to ${toName.split(" ")[0]} — logged on their ${refType === "client" ? "record" : "lead card"}`, <CheckCheck size={14} />);
+  };
+
   const file = (item: InboxItem) => {
     dispatch({ type: "FILE_INBOX", id: item.id });
     toast(`Filed to ${item.clientId ? byClient(state, item.clientId)?.name ?? "record" : "general files"}`, <Archive size={14} />);
@@ -60,7 +67,24 @@ export default function Inbox() {
         </span>
       </div>
 
-      {/* pending */}
+      {/* tabs */}
+      <div className="mb-5 flex flex-wrap items-center gap-2">
+        {([{ k: "in" as const, l: "Inbound — triaged for you", n: pending.length }, { k: "out" as const, l: "Outbound — AI drafted, awaiting send", n: drafts.length }]).map((t) => (
+          <button key={t.k} onClick={() => setTab(t.k)} className={`chip cursor-pointer transition ${tab === t.k ? "border-gold-500/50 bg-gold-500/15 text-gold-300" : "hover:border-white/20 hover:text-cream-100"}`}>
+            {t.l} <span className="opacity-60">{t.n}</span>
+          </button>
+        ))}
+        {tab === "out" && drafts.length > 0 && (
+          <button
+            onClick={() => { drafts.forEach((d) => dispatch({ type: "SEND_OUTBOX", id: d.id })); toast(`${drafts.length} pieces sent — the agents are unstoppable`, <CheckCheck size={14} />); }}
+            className="btn-gold ml-auto flex items-center gap-2 px-4 py-2 text-[12px]"
+          >
+            <CheckCheck size={13} /> Approve all {drafts.length}
+          </button>
+        )}
+      </div>
+
+      {tab === "in" && (
       <div className="space-y-4">
         <AnimatePresence initial={false}>
           {pending.length === 0 && (
@@ -185,8 +209,72 @@ export default function Inbox() {
         </AnimatePresence>
       </div>
 
+      )}
+
+      {tab === "out" && (
+        <div className="space-y-4">
+          <AnimatePresence initial={false}>
+            {state.outbox.map((item, idx) => {
+              const ref = item.refType === "client"
+                ? state.clients.find((c) => c.id === item.refId)
+                : state.leads.find((l) => l.id === item.refId);
+              const KIND_TONE: Record<string, Tone> = { "Follow-up": "sky", Proposal: "gold", "Engagement letter": "gold", Reminder: "cream", Welcome: "sage", "Invoice link": "clay" };
+              return (
+                <motion.div
+                  key={item.id}
+                  layout
+                  initial={{ opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, x: 60 }}
+                  transition={{ delay: idx * 0.04 }}
+                  className={`card p-5 transition ${item.sent ? "opacity-55" : ""}`}
+                >
+                  <div className="flex flex-wrap items-start gap-4">
+                    {ref && <Avatar src={ref.avatar} name={ref.name} size={46} />}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge tone={KIND_TONE[item.kind] ?? "mute"}>{item.kind}</Badge>
+                        <Badge tone="mute"><Sparkles size={9} /> {item.agent}</Badge>
+                        <span className="text-[11px] text-cream-600">→ {item.toName}</span>
+                      </div>
+                      <p className="mt-1.5 text-[13.5px] font-semibold text-cream-100">{item.subject}</p>
+                      <p className="mt-0.5 line-clamp-2 text-[12.5px] leading-relaxed text-cream-400">{item.preview}</p>
+                      <p className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-gold-400/80">
+                        <Sparkles size={10} /> {item.eta}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      {item.sent ? (
+                        <Badge tone="sage" dot>Sent & filed</Badge>
+                      ) : (
+                        <>
+                          <button onClick={() => sendOut(item.id, item.kind, item.toName, item.refType)} className="btn-gold flex items-center gap-1.5 px-4 py-2 text-[11.5px]">
+                            <Send size={12} /> Approve & send
+                          </button>
+                          <div className="flex gap-2">
+                            <button onClick={() => toast("Scheduled for 8:12am tomorrow — this client's peak open window", <Target size={13} />)} className="btn-ghost px-3 py-1.5 text-[11px] font-semibold">
+                              Optimal time
+                            </button>
+                            <button onClick={() => toast("Rewritten — shorter, warmer, same substance", <Sparkles size={13} />)} className="btn-ghost px-3 py-1.5 text-[11px] font-semibold">
+                              Rewrite
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+          <p className="pt-1 text-center text-[11px] text-cream-600">
+            Outbound drafts are built from your sent-mail voice model — approval is the only human step.
+          </p>
+        </div>
+      )}
+
       {/* handled */}
-      {handled.length > 0 && (
+      {tab === "in" && handled.length > 0 && (
         <div className="mt-8">
           <SectionHead title="Handled — auto-filed" sub="Ordo already took care of these. Undo lives on each client record." />
           <div className="card divide-y divide-white/4 overflow-hidden">

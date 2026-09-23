@@ -1,4 +1,4 @@
-import { Cable, FolderKanban, Inbox, LayoutDashboard, ListChecks, Sparkles, Target, UserPlus, Users, Workflow, Zap } from "lucide-react";
+import { Cable, FolderKanban, Inbox, LayoutDashboard, ListChecks, Sparkles, Target, UserPlus, Users, Wallet, Workflow, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 import { pendingInbox, useNav, useStore, type ViewName } from "../lib/store";
 import { OWNER } from "../lib/data";
@@ -10,6 +10,7 @@ const NAV: { name: ViewName; label: string; icon: React.ElementType; count?: (s:
   { name: "leads", label: "Leads", icon: UserPlus, count: (s) => s.leads.filter((l: any) => l.stage !== "won" && l.stage !== "lost").length },
   { name: "clients", label: "Clients", icon: Users, count: (s) => s.clients.length },
   { name: "opps", label: "Opportunities", icon: Target, count: (s) => s.opps.filter((o: any) => o.stage !== "won" && o.stage !== "lost").length },
+  { name: "money", label: "Money", icon: Wallet, count: (s) => s.invoices.filter((v: any) => v.status === "sent" || v.status === "overdue").length },
   { name: "projects", label: "Projects", icon: FolderKanban, count: (s) => s.projects.filter((p: any) => p.status !== "done").length },
   { name: "tasks", label: "Tasks", icon: ListChecks, count: (s) => s.tasks.filter((t: any) => !t.done).length },
   { name: "automations", label: "Automations", icon: Workflow, count: (s) => s.automations.filter((a: any) => a.enabled).length },

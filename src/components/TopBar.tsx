@@ -1,4 +1,4 @@
-import { AlarmClock, Bell, Cable, ChevronDown, Command, FileSearch, Keyboard, LogOut, Mic, Radar, Search, Settings, Sparkles, UserRound } from "lucide-react";
+import { AlarmClock, Bell, Cable, ChevronDown, Command, FileSearch, Keyboard, LogOut, Mic, Radar, Search, Settings, Sparkles, UserRound, WandSparkles } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
 import { useStore, useNav } from "../lib/store";
@@ -11,6 +11,7 @@ const TITLES: Record<string, { title: string; sub: string }> = {
   leads: { title: "Leads & Prospects", sub: "Every inquiry, scored and chased automatically" },
   clients: { title: "Clients & Entities", sub: "Your whole book of business, one glance" },
   opps: { title: "Opportunities", sub: "Proposals and pipeline value, live" },
+  money: { title: "Money", sub: "Collected, outstanding, and forecast — reconciled without you" },
   projects: { title: "Projects & Engagements", sub: "Status, progress, and whose court the ball is in" },
   tasks: { title: "Tasks & Deadlines", sub: "AI-prioritized, automation-maintained" },
   automations: { title: "Automations", sub: "Your invisible staff — working while you sleep" },
@@ -19,7 +20,7 @@ const TITLES: Record<string, { title: string; sub: string }> = {
 
 const NOTIF_ICONS: Record<string, React.ElementType> = { FileSearch, Radar, AlarmClock, Mic };
 
-export default function TopBar({ onSearch, onAI, onProfile, onSignOut }: { onSearch: () => void; onAI: () => void; onProfile: () => void; onSignOut: () => void }) {
+export default function TopBar({ onSearch, onAI, onCapture, onProfile, onSignOut }: { onSearch: () => void; onAI: () => void; onCapture: () => void; onProfile: () => void; onSignOut: () => void }) {
   const { route, go } = useNav();
   const { state, dispatch } = useStore();
   const toast = useToast();
@@ -47,6 +48,14 @@ export default function TopBar({ onSearch, onAI, onProfile, onSignOut }: { onSea
         </button>
         <button onClick={onSearch} className="btn-ghost flex h-10 w-10 items-center justify-center md:hidden">
           <Search size={16} />
+        </button>
+
+        <button onClick={onCapture} className="btn-ghost flex h-10 items-center gap-2 px-4 text-[13px] font-semibold" title="Quick Capture · ⌘J">
+          <WandSparkles size={15} className="text-gold-400" />
+          <span className="hidden md:inline">Capture</span>
+          <span className="hidden items-center gap-0.5 rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-semibold text-cream-500 lg:flex">
+            <Command size={10} /> J
+          </span>
         </button>
 
         <button onClick={onAI} className="btn-gold flex h-10 items-center gap-2 px-4 text-[13px]">
